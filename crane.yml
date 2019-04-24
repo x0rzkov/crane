@@ -8,6 +8,15 @@ services:
     workdir: /crane
     share-ssh-socket: true
     cmd: ["bash"]
+  
+  tensorflow:
+    image: tensorflow/tensorflow:latest-gpu-py3
+    rm: true
+    interactive: true
+    tty: true
+    runtime: nvidia
+    gpus: all
+    cmd: ["bash"]
 
 commands:
   test: run crane make test

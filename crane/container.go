@@ -12,6 +12,8 @@ import (
 	"sync"
 )
 
+const netBridge = "bridge"
+
 type Container interface {
 	ContainerInfo
 	Exists() bool
@@ -168,6 +170,8 @@ type container struct {
 	RawWorking_Dir       string                `json:"working_dir" yaml:"working_dir"`
 	RawCmd               interface{}           `json:"cmd" yaml:"cmd"`
 	RawCommand           interface{}           `json:"command" yaml:"command"`
+	RawGpus              string                `json:"gpus" yaml:"gpus"`
+	RawRuntime           string                `json:"runtime" yaml:"runtime"`
 	hooks                hooks
 	networks             map[string]NetworkParameters
 	stdout               io.Writer
@@ -250,7 +254,7 @@ func (c *container) Dependencies() *Dependencies {
 			dependencies.Requires = append(dependencies.Requires, required)
 		}
 	}
-	if c.Net() == "bridge" {
+	if c.Net() == netBridge {
 		// links are strict dependencies only on bridge networks
 		for _, link := range c.Link() {
 			linkName := strings.Split(link, ":")[0]
@@ -284,6 +288,20 @@ func (c *container) Dependencies() *Dependencies {
 
 func (c *container) Name() string {
 	return expandEnv(c.RawName)
+}
+
+func (c *container) Gpus() string {
+	if len(c.RawGpus) > 0 {
+		return expandEnv(c.RawGpus)
+	}
+	return ""
+}
+
+func (c *container) Runtime() string {
+	if len(c.RawRuntime) > 0 {
+		return expandEnv(c.RawRuntime)
+	}
+	return ""
 }
 
 func (c *container) ActualName(adHoc bool) string {
@@ -704,8 +722,8 @@ func (c *container) ActualNet() string {
 	if len(netParam) == 0 {
 		return ""
 	}
-	if netParam == "bridge" {
-		return "bridge"
+	if netParam == netBridge {
+		return netBridge
 	} else if netParam == "none" {
 		return "none"
 	}
@@ -943,7 +961,7 @@ func (c *container) Create(cmds []string) {
 	}
 	msg := "Creating container %s"
 	if adHoc {
-		msg = msg + " (ad-hoc)"
+		msg += " (ad-hoc)"
 	}
 	fmt.Fprintf(c.CommandsOut(), msg+" ...\n", c.ActualName(adHoc))
 
@@ -964,7 +982,7 @@ func (c *container) Run(cmds []string, targeted bool, detachFlag bool) {
 	}
 	msg := "Running container %s"
 	if adHoc {
-		msg = msg + " (ad-hoc)"
+		msg += " (ad-hoc)"
 	}
 	fmt.Fprintf(c.CommandsOut(), msg+" ...\n", c.ActualName(adHoc))
 
@@ -1036,6 +1054,7 @@ func (c *container) executePostStartHook(adHoc bool) *sync.WaitGroup {
 func (c *container) createArgs(cmds []string) []string {
 	adHoc := (len(cmds) > 0)
 	args := []string{}
+
 	// AddHost
 	for _, addHost := range c.AddHost() {
 		args = append(args, "--add-host", addHost)
@@ -1249,7 +1268,7 @@ func (c *container) createArgs(cmds []string) []string {
 	}
 	// Net
 	netParam := c.ActualNet()
-	if len(netParam) > 0 && netParam != "bridge" {
+	if len(netParam) > 0 && netParam != netBridge {
 		args = append(args, "--net", netParam)
 	}
 	// NetAlias
@@ -1379,6 +1398,18 @@ func (c *container) createArgs(cmds []string) []string {
 	if len(c.Workdir()) > 0 {
 		args = append(args, "--workdir", c.Workdir())
 	}
+
+        // Runtime
+        fmt.Println("Runtime: ", c.Runtime())
+        if len(c.Runtime()) > 0 {
+                args = append(args, fmt.Sprintf("--runtime=%s", c.Runtime()))
+        }
+        // GPUs
+        fmt.Println("Gpus: ", c.Gpus())
+        if len(c.Gpus()) > 0 {
+                args = append(args, "--gpus", c.Gpus())
+        }
+
 	// Name
 	args = append(args, "--name", c.ActualName(adHoc))
 	// Image

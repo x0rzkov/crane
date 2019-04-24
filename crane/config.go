@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	// "github.com/k0kubun/pp"
 	"github.com/imdario/mergo"
 	yaml "gopkg.in/yaml.v2"
 )
@@ -122,6 +123,8 @@ func unmarshal(data []byte, ext string) *config {
 		err = displaySyntaxError(data, err)
 		panic(StatusError{err, 65})
 	}
+	//pp.Println(config)
+	//os.Exit(1)
 	return config
 }
 
